@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard pengguna yang telah terautentikasi">
+
+    {# SECURITY: X-Content-Type-Options, X-Frame-Options, dan CSP dikonfigurasi di settings.py via SecurityMiddleware. #}
+    {# Template ini tidak menggunakan |safe filter atau mark_safe() sehingga semua output otomatis di-escape oleh Django. #}
+
+    <title>Dashboard — Secure Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #764ba2;
+            --success: #4caf50;
+            --error: #ff5252;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text-muted: #888;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e0e0e0;
+            padding: 1.5rem;
+        }
+
+        /* ── Animated background particles ── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(102,126,234,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(118,75,162,0.08) 0%, transparent 50%);
+            animation: drift 15s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes drift {
+            from { transform: rotate(0deg) scale(1); }
+            to   { transform: rotate(5deg) scale(1.05); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 560px;
+        }
+
+        /* ── Main card ── */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.75rem 2.5rem;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4),
+                        inset 0 1px 0 rgba(255,255,255,0.1);
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Header ── */
+        .card-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .shield-icon {
+            width: 64px; height: 64px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.75rem;
+            margin: 0 auto 1.25rem;
+            box-shadow: 0 8px 24px rgba(102,126,234,0.35);
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 8px 24px rgba(102,126,234,0.35); }
+            50%       { box-shadow: 0 8px 32px rgba(102,126,234,0.6); }
+        }
+
+        .card-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        /* ─────────────────────────────────────────────────────
+           PESAN UTAMA — SESUAI PERMINTAAN TUGAS
+           Teks ini dirender dari konteks template Django yang
+           di-escape secara otomatis. Tidak menggunakan |safe.
+           ───────────────────────────────────────────────────── */
+        .welcome-banner {
+            background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+            border: 1px solid rgba(102,126,234,0.3);
+            border-radius: 14px;
+            padding: 1.5rem 1.75rem;
+            text-align: center;
+            margin-bottom: 1.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .welcome-banner::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            from { left: -100%; }
+            to   { left: 100%; }
+        }
+
+        .welcome-banner .welcome-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #e8e8ff;
+            letter-spacing: 0.01em;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Info rows ── */
+        .info-panel {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 1.75rem;
+        }
+
+        .info-panel .panel-title {
+            padding: 0.75rem 1.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.85rem 1.25rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.15s;
+        }
+
+        .info-row:last-child { border-bottom: none; }
+        .info-row:hover { background: rgba(255,255,255,0.03); }
+
+        .info-label {
+            font-size: 0.83rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-value {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #d0d0e8;
+            max-width: 60%;
+            text-align: right;
+            word-break: break-all;
+        }
+
+        /* ── Status badge ── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(76,175,80,0.15);
+            border: 1px solid rgba(76,175,80,0.3);
+            border-radius: 100px;
+            padding: 0.2rem 0.65rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+
+        /* ── Security chip row ── */
+        .security-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 100px;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+
+        .chip .chip-icon { font-size: 0.85rem; }
+
+        /* ── Logout button ── */
+        .btn-logout {
+            width: 100%;
+            padding: 0.85rem;
+            background: rgba(255, 82, 82, 0.1);
+            border: 1px solid rgba(255, 82, 82, 0.3);
+            border-radius: 10px;
+            color: #ff7070;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.1s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 82, 82, 0.2);
+            border-color: rgba(255, 82, 82, 0.5);
+        }
+
+        .btn-logout:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+
+            <!-- ── Header ── -->
+            <div class="card-header">
+                <div class="shield-icon">🛡️</div>
+                <h1>Dashboard Pengguna</h1>
+                <span class="status-badge">
+                    <span class="status-dot"></span>
+                    Sesi Aktif
+                </span>
+            </div>
+
+            <!--
+                ═══════════════════════════════════════════════════════
+                PESAN UTAMA YANG DIWAJIBKAN TUGAS
+                Teks di bawah ini di-hardcode (bukan dari input user),
+                sehingga tidak ada risiko XSS.
+                Jika user.username dirender di bawahnya, Django
+                otomatis melakukan HTML-escaping pada variabel template.
+                ═══════════════════════════════════════════════════════
+            -->
+            <div class="welcome-banner">
+                <p class="welcome-text">Selamat datang di website buatan saya</p>
+            </div>
+
+            <!-- ── User info panel ── -->
+            <!-- SECURITY: Semua output variabel di-escape secara otomatis oleh Django Template Engine.
+                 Tidak ada penggunaan |safe atau mark_safe() pada data yang berasal dari user. -->
+            <div class="info-panel">
+                <div class="panel-title">Informasi Akun</div>
+                <div class="info-row">
+                    <span class="info-label">👤 Username</span>
+                    <span class="info-value">{{ user.username }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">📧 Email</span>
+                    <span class="info-value">{{ user.email|default:"—" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">🕐 Login Terakhir</span>
+                    <span class="info-value">{{ user.last_login|date:"d M Y, H:i"|default:"Pertama kali" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">📅 Bergabung Sejak</span>
+                    <span class="info-value">{{ user.date_joined|date:"d M Y" }}</span>
+                </div>
+            </div>
+
+            <!-- ── Security feature chips ── -->
+            <div class="security-chips">
+                <span class="chip"><span class="chip-icon">🔐</span> Argon2id Hash</span>
+                <span class="chip"><span class="chip-icon">🛡️</span> CSRF Protected</span>
+                <span class="chip"><span class="chip-icon">🔒</span> HTTPS/HSTS</span>
+                <span class="chip"><span class="chip-icon">⚡</span> CSP Header</span>
+                <span class="chip"><span class="chip-icon">🚫</span> XSS Safe</span>
+            </div>
+
+            <!-- ── Logout form ── -->
+            <!-- SECURITY: Logout menggunakan POST (bukan GET) untuk mencegah CSRF-based forced logout
+                 melalui tag <img> atau <a href> dari situs lain. Token CSRF wajib ada. -->
+            <form method="POST" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-logout" id="btn-logout">
+                    🚪 Keluar dari Akun
+                </button>
+            </form>
+
+        </div>
+    </div>
+</body>
+</html>

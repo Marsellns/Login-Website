@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Masuk ke akun Anda dengan aman">
+    <!--
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║  CATATAN KEAMANAN XSS                                           ║
+    ║                                                                  ║
+    ║  • Semua variabel template di-escape otomatis oleh Django.         ║
+    ║  • Filter |safe TIDAK digunakan di mana pun dalam template ini. ║
+    ║  • Pesan error dari messages framework juga di-escape.          ║
+    ║  • CSRF token disertakan via {% csrf_token %}.                  ║
+    ╚══════════════════════════════════════════════════════════════════╝
+    -->
+    <title>Login — Secure Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary:       #667eea;
+            --primary-dark:  #764ba2;
+            --success:       #4caf50;
+            --error:         #ff5252;
+            --info:          #2196f3;
+            --card-bg:       rgba(255, 255, 255, 0.05);
+            --border:        rgba(255, 255, 255, 0.12);
+            --text-dim:      #999;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e0e0e0;
+            padding: 1.5rem;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(102,126,234,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(118,75,162,0.08) 0%, transparent 50%);
+            animation: drift 15s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+
+        @keyframes drift {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(4deg) scale(1.04); }
+        }
+
+        /* ── Card ── */
+        .auth-card {
+            position: relative;
+            z-index: 1;
+            background: var(--card-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.75rem 2.5rem;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4),
+                        inset 0 1px 0 rgba(255,255,255,0.1);
+            animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Logo / icon ── */
+        .logo {
+            width: 60px; height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 8px 20px rgba(102,126,234,0.35);
+        }
+
+        /* ── Headings ── */
+        .auth-card h1 {
+            text-align: center;
+            font-size: 1.65rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            background: linear-gradient(90deg, #a0b4ff, #d8aeff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.88rem;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Messages ── */
+        .messages { list-style: none; margin-bottom: 1.25rem; }
+
+        .messages li {
+            padding: 0.7rem 1rem;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .messages .error   { background: rgba(255,82,82,.12);   border: 1px solid rgba(255,82,82,.28);   color: #ff7070; }
+        .messages .success { background: rgba(76,175,80,.12);   border: 1px solid rgba(76,175,80,.28);   color: #6fcf74; }
+        .messages .info    { background: rgba(33,150,243,.12);  border: 1px solid rgba(33,150,243,.28);  color: #64b5f6; }
+
+        /* ── Form groups ── */
+        .form-group { margin-bottom: 1.35rem; }
+
+        .form-group label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 0.45rem;
+            color: #bbb;
+        }
+
+        /* SECURITY: maxlength="150" pada input username dan tidak ada maxlength
+           berlebih pada password (handled di backend). Validasi ini mencegah
+           pengiriman payload oversized dari sisi frontend (Buffer Overflow mitigation). */
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.13);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+
+        .form-group input::placeholder { color: rgba(255,255,255,0.25); }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.09);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.22);
+        }
+
+        /* ── Submit button ── */
+        .btn-primary {
+            width: 100%;
+            padding: 0.9rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.97rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+        }
+
+        .btn-primary:active { transform: scale(0.98); }
+
+        /* ── Footer links ── */
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.84rem;
+            color: #888;
+        }
+
+        .auth-footer a {
+            color: #8ea8ff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .auth-footer a:hover { text-decoration: underline; }
+
+        /* ── Security badge ── */
+        .security-badge {
+            text-align: center;
+            margin-top: 1.75rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .badge-item {
+            font-size: 0.72rem;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .badge-item .dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-card">
+
+        <div class="logo">🔐</div>
+        <h1>Selamat Datang</h1>
+        <p class="subtitle">Masuk dengan ID / Username dan kata sandi Anda</p>
+
+        <!-- ─── Pesan Django (auto-escaped, aman dari XSS) ─── -->
+        {# SECURITY: message.tags dan teks message di-escape secara otomatis. Filter |safe tidak digunakan. #}
+        {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+            <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!--
+            PROTEKSI CSRF:
+            Field tersembunyi {% csrf_token %} mencegah Cross-Site Request Forgery.
+            Penyerang dari domain lain tidak dapat memalsukan request POST yang valid
+            karena mereka tidak dapat memperoleh token CSRF yang terikat ke sesi user.
+        -->
+        <form method="POST" action="{% url 'login' %}" novalidate>
+            {% csrf_token %}
+
+            {# Pertahankan parameter ?next= untuk pengalihan setelah login #}
+            {% if request.GET.next %}
+            <input type="hidden" name="next" value="{{ request.GET.next }}">
+            {% endif %}
+
+            <div class="form-group">
+                <label for="id_username">ID / Username</label>
+                <!--
+                    SECURITY (Buffer Overflow Prevention):
+                    maxlength="150" di sini adalah validasi sisi FRONTEND.
+                    Backend juga memvalidasi panjang yang sama (len(username) <= 150)
+                    di views.py sebelum menyentuh database.
+                    Tidak ada raw SQL — semua query melalui Django ORM (Parameterized).
+                -->
+                <input type="text"
+                       id="id_username"
+                       name="username"
+                       autocomplete="username"
+                       maxlength="150"
+                       placeholder="Masukkan username Anda"
+                       required
+                       autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="id_password">Password</label>
+                <!--
+                    SECURITY (Buffer Overflow Prevention):
+                    maxlength="128" di sisi frontend. Backend membatasi ukuran
+                    payload total request via DATA_UPLOAD_MAX_MEMORY_SIZE di settings.py.
+                    Password tidak pernah disimpan plaintext — di-hash dengan Argon2id + salt acak.
+                -->
+                <input type="password"
+                       id="id_password"
+                       name="password"
+                       autocomplete="current-password"
+                       maxlength="128"
+                       placeholder="Masukkan kata sandi Anda"
+                       required>
+            </div>
+
+            <button type="submit" class="btn-primary" id="btn-login">
+                Masuk ke Akun
+            </button>
+        </form>
+
+        <p class="auth-footer">
+            Belum punya akun? <a href="{% url 'register' %}">Daftar sekarang</a>
+        </p>
+
+        <div class="security-badge">
+            <span class="badge-item"><span class="dot"></span> Argon2id</span>
+            <span class="badge-item"><span class="dot"></span> CSRF Guard</span>
+            <span class="badge-item"><span class="dot"></span> HSTS/TLS</span>
+            <span class="badge-item"><span class="dot"></span> CSP Header</span>
+        </div>
+    </div>
+</body>
+</html>

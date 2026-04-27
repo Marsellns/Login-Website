@@ -1,0 +1,11 @@
+# Core Framework
+Django>=5.1,<5.2
+
+# MySQL Database Adapter (C-compiled, but a trusted, well-audited library)
+mysqlclient>=2.2.0
+
+# Argon2 Password Hashing (winner of the Password Hashing Competition)
+argon2-cffi>=23.1.0
+
+# Production WSGI Server
+gunicorn>=22.0.0
