@@ -25,7 +25,8 @@ SECRET_KEY = "dev-only-insecure-key-do-not-use-in-production-!@#$%"
 
 # ── Debug mode ─────────────────────────────────────────────────────────────────
 DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "0.0.0.0"]
+ALLOWED_HOSTS = ["*"]  # Mengizinkan Ngrok host
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app', 'https://*.ngrok.io', 'https://*.ngrok-free.dev']  # Mencegah error CSRF saat pakai Ngrok
 
 # ── Installed Apps ──────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
