@@ -77,28 +77,39 @@ Snort 3 membaca file *rules* dengan format yang sama, namun kita akan membuat fi
 
 ## Tahap 4: Menjalankan Snort (Mode Pendeteksi Layar)
 
-Untuk menjalankan Snort 3 agar langsung mencetak peringatan berwarna di layar terminal Anda saat ada serangan, gunakan perintah berikut:
+Karena kita akan menguji serangan ke server Django lokal kita sendiri (localhost), kita harus mengatur Snort untuk memantau jalur lokal (`lo`), bukan jalur internet luar (`eth0`). Kita juga harus menambahkan `-k none` agar Snort tidak mengabaikan paket lokal.
 
 ```bash
-sudo snort -c /etc/snort/snort.lua -R /etc/snort/rules/local.rules -i eth0 -A alert_fast
+sudo snort -c /etc/snort/snort.lua -R /etc/snort/rules/local.rules -i lo -A alert_fast -k none
 ```
-*(Snort akan bersiap dan mendengarkan jaringan. Biarkan terminal ini tetap menyala).*
+*(Snort akan bersiap dan mendengarkan jaringan lokal. Biarkan terminal ini tetap menyala).*
 
 ---
 
-## Tahap 5: Pengujian Serangan
+## Tahap 5: Pengujian Serangan (Simulasi Real)
 
-Buka **Terminal Baru** di Kali Linux Anda, dan cobalah lakukan serangan ke diri sendiri untuk memancing alarm Snort:
+Buka **Terminal Baru** di Kali Linux Anda. Kita akan menyerang server Django kita sendiri!
 
-1. **Uji Coba Ping**
+1. **Pastikan Server Django Anda Menyala**
+   Jika belum menyala, jalankan server Django Anda di port 8000:
    ```bash
-   ping 10.0.2.15
+   python manage.py runserver
    ```
-   👉 *Buka kembali terminal Snort, Anda akan melihat log berteriak "Ada aktivitas PING terdeteksi!"*
 
-2. **Uji Coba Serangan Web (XSS/SQLi)**
-   Jika server Django Anda menyala di port 8000, tembak dengan *payload* mematikan menggunakan `curl`:
+2. **Uji Coba Ping Lokal**
+   Buka terminal baru lagi (Terminal ke-3), lalu ping ke localhost:
+   ```bash
+   ping 127.0.0.1
+   ```
+   👉 *Snort akan langsung mendeteksi "Ada aktivitas PING terdeteksi!"*
+
+3. **Uji Coba Serangan Web (XSS/SQLi) ke Django**
+   Gunakan `curl` untuk menembak teks berbahaya langsung ke form login Django Anda:
    ```bash
    curl "http://127.0.0.1:8000/accounts/login/?username=<script>"
    ```
-   👉 *Snort akan mendeteksi *string* berbahaya tersebut dan mencetak "Potensi XSS terdeteksi!"*
+   dan uji coba SQL Injection:
+   ```bash
+   curl "http://127.0.0.1:8000/accounts/login/?username=' OR 1=1"
+    ```
+   👉 *Snort akan mendeteksi string berbahaya tersebut dan mencetak "Potensi XSS terdeteksi!" atau SQL Injection.*
