@@ -1,0 +1,30 @@
+# =====================================================================
+# PORTSCAN RULES (MANUAL UPDATE)
+# Location: /etc/snort/rules/portscan.rules
+# Description: Rule manual untuk mendeteksi Port Scanning
+# =====================================================================
+
+# Catatan: SNORT biasanya memiliki preprocessor 'sfPortscan' untuk mendeteksi
+# scan, namun kita juga bisa membuat rule manual (signature-based) untuk 
+# mendeteksi tools spesifik seperti Nmap.
+
+# 1. NMAP TCP SYN SCAN (Half-Open Scan)
+# Mendeteksi SYN packet dengan window size spesifik Nmap (1024, 2048, 3072, 4096)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"[SCAN] Nmap TCP SYN Scan"; flags:S; window:1024; classtype:network-scan; sid:1000201; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"[SCAN] Nmap TCP SYN Scan"; flags:S; window:2048; classtype:network-scan; sid:1000202; rev:1;)
+
+# 2. XMAS SCAN (Stealth Scan)
+# Mendeteksi paket dengan flag FIN, PSH, URG menyala bersamaan
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"[SCAN] XMAS Stealth Scan Detected"; flags:FPU; classtype:network-scan; sid:1000203; rev:1;)
+
+# 3. NULL SCAN
+# Mendeteksi TCP packet tanpa flag sama sekali (semua 0)
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"[SCAN] NULL Stealth Scan Detected"; flags:0; classtype:network-scan; sid:1000204; rev:1;)
+
+# 4. FIN SCAN
+# Mendeteksi paket FIN tanpa session yang established
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"[SCAN] FIN Stealth Scan Detected"; flags:F; classtype:network-scan; sid:1000205; rev:1;)
+
+# 5. GENERAL PORT SWEEP
+# Deteksi banyak SYN request ke berbagai port dalam waktu singkat
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"[SCAN] Possible TCP Port Sweep/Scan"; flags:S; detection_filter:track by_src, count 20, seconds 5; classtype:network-scan; sid:1000206; rev:1;)

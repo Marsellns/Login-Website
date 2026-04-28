@@ -332,6 +332,11 @@
                 <span class="chip"><span class="chip-icon">🚫</span> XSS Safe</span>
             </div>
 
+            <!-- ── SNORT Dashboard Link ── -->
+            <a href="{% url 'snort_logs' %}" class="btn-logout" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3); color: #60a5fa; text-decoration: none; margin-bottom: 0.75rem;">
+                🐷 Monitoring SNORT IDS/IPS
+            </a>
+
             <!-- ── Logout form ── -->
             <!-- SECURITY: Logout menggunakan POST (bukan GET) untuk mencegah CSRF-based forced logout
                  melalui tag <img> atau <a href> dari situs lain. Token CSRF wajib ada. -->

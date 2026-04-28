@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNORT IDS Monitoring Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(20, 25, 40, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --primary: #3b82f6;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(239, 68, 68, 0.15) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .title-group h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .title-group p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-demo {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .pulse {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(currentColor, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(currentColor, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(currentColor, 0); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover { transform: translateY(-5px); }
+
+        .stat-title {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .stat-sqli { color: #f43f5e; }
+        .stat-xss { color: #8b5cf6; }
+        .stat-icmp { color: #3b82f6; }
+        .stat-scan { color: #f59e0b; }
+
+        .alerts-section {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .alerts-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        th {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(0,0,0,0.2);
+        }
+
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .time-col { color: var(--text-muted); font-family: monospace; font-size: 0.9rem; }
+        .ip-col { font-family: monospace; font-size: 0.9rem; color: #cbd5e1; }
+        
+        .alert-msg {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .severity-high { color: var(--danger); font-weight: 500; }
+        .severity-med { color: var(--warning); font-weight: 500; }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.15); }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title-group">
+                <h1>🐷 SNORT IDS/IPS Dashboard</h1>
+                <p>Network Intrusion Detection System — Real-time Alerts</p>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                {% if is_live %}
+                    <div class="status-badge status-active">
+                        <span class="pulse"></span> Live /var/log/snort/alert
+                    </div>
+                {% else %}
+                    <div class="status-badge status-demo">
+                        <span class="pulse"></span> Demo Mode (No Log File)
+                    </div>
+                {% endif %}
+                <a href="{% url 'dashboard' %}" class="btn-back">⬅️ Kembali</a>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Total Alerts</div>
+                <div class="stat-value">{{ total_alerts }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">SQL Injections</div>
+                <div class="stat-value stat-sqli">{{ stats.sqli }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">XSS Attempts</div>
+                <div class="stat-value stat-xss">{{ stats.xss }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Port Scans</div>
+                <div class="stat-value stat-scan">{{ stats.scan }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">ICMP Anomalies</div>
+                <div class="stat-value stat-icmp">{{ stats.icmp }}</div>
+            </div>
+        </div>
+
+        <div class="alerts-section">
+            <div class="alerts-header">
+                <h3 style="font-size: 1.1rem; font-weight: 600;">Latest Security Alerts</h3>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Alert Message</th>
+                            <th>Source -> Destination</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alerts %}
+                        <tr>
+                            <td class="time-col">{{ alert.timestamp }}</td>
+                            <td>
+                                <span class="alert-msg {% if 'SQL' in alert.message or 'Brute Force' in alert.message %}severity-high{% else %}severity-med{% endif %}">
+                                    {% if 'SQL' in alert.message %}💉{% elif 'XSS' in alert.message %}🕷️{% elif 'ICMP' in alert.message %}🏓{% elif 'SCAN' in alert.message %}🔍{% else %}⚠️{% endif %}
+                                    {{ alert.message }}
+                                </span>
+                            </td>
+                            <td class="ip-col">{{ alert.source_dest }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                Tidak ada alert serangan yang terdeteksi. Sistem aman.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# =====================================================================
+# LOCAL RULES FOR DJANGO WEB APPLICATION
+# Location: /etc/snort/rules/local.rules
+# Description: Rule spesifik untuk melindungi web server Django
+# =====================================================================
+
+# 1. SQL INJECTION DETECTION
+# Mendeteksi query SQL standar di URI atau payload
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] SQL Injection Attempt Detected (UNION SELECT)"; flow:established,to_server; content:"UNION"; nocase; content:"SELECT"; nocase; distance:0; classtype:web-application-attack; sid:1000001; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] SQL Injection Attempt Detected (OR 1=1)"; flow:established,to_server; content:"OR"; nocase; content:"1=1"; nocase; distance:0; classtype:web-application-attack; sid:1000002; rev:1;)
+
+# 2. XSS (CROSS SITE SCRIPTING) DETECTION
+# Mendeteksi tag script pada request
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] XSS Attempt Detected (<script>)"; flow:established,to_server; content:"<script"; nocase; http_uri; classtype:web-application-attack; sid:1000003; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] XSS Attempt Detected (javascript:)"; flow:established,to_server; content:"javascript:"; nocase; http_uri; classtype:web-application-attack; sid:1000004; rev:1;)
+
+# 3. DIRECTORY TRAVERSAL
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] Directory Traversal Attempt (../)"; flow:established,to_server; content:"../"; http_uri; classtype:web-application-attack; sid:1000005; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] Linux /etc/passwd Access Attempt"; flow:established,to_server; content:"/etc/passwd"; http_uri; classtype:web-application-attack; sid:1000006; rev:1;)
+
+# 4. BRUTE FORCE LOGIN DETECTION
+# Mendeteksi > 5 percobaan POST ke /accounts/login/ dalam 1 menit
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] Possible Login Brute Force Attempt"; flow:established,to_server; content:"POST"; http_method; content:"/accounts/login/"; http_uri; detection_filter:track by_src, count 5, seconds 60; classtype:suspicious-login; sid:1000007; rev:1;)
+
+# 5. ADMIN PANEL ACCESS
+alert tcp $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS (msg:"[WEB] Access to Django Admin Panel Detected"; flow:established,to_server; content:"/admin/"; http_uri; classtype:policy-violation; sid:1000008; rev:1;)

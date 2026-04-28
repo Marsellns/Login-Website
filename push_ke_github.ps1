@@ -14,7 +14,7 @@ git add .
 
 # 4. Membuat Commit
 Write-Host "[4/5] Membuat commit pertama..." -ForegroundColor Yellow
-git commit -m "Initial commit - Secure Django Auth (SALT, HASH, XSS, CSRF)"
+git commit -m "Update: SNORT IDS/IPS + ACL Integration & Dashboard"
 
 # 5. Push ke GitHub
 Write-Host "[5/5] Mengupload ke GitHub (Branch Main)..." -ForegroundColor Yellow

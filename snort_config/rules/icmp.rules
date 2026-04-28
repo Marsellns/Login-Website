@@ -1,0 +1,24 @@
+# =====================================================================
+# ICMP RULES (MANUAL UDPATE)
+# Location: /etc/snort/rules/icmp.rules
+# Description: Rule manual untuk mendeteksi serangan berbasis ICMP
+# =====================================================================
+
+# 1. PING FLOOD / DoS
+# Mendeteksi lebih dari 50 paket ICMP (ping) dalam 10 detik dari satu sumber
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"[ICMP] Ping Flood / DoS Attempt Detected"; itype:8; detection_filter:track by_src, count 50, seconds 10; classtype:attempted-dos; sid:1000101; rev:1;)
+
+# 2. PING OF DEATH
+# Mendeteksi paket ICMP dengan ukuran sangat besar (dsize > 800 bytes bisa mencurigakan)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"[ICMP] Large ICMP Packet (Possible Ping of Death)"; dsize:>800; itype:8; classtype:attempted-dos; sid:1000102; rev:1;)
+
+# 3. NMAP ICMP PING (Host Discovery)
+# Nmap biasanya menggunakan data spesifik dalam payload ping-nya
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"[ICMP] Nmap Host Discovery Ping"; itype:8; dsize:0; classtype:network-scan; sid:1000103; rev:1;)
+
+# 4. ICMP REDIRECT
+# Sering digunakan dalam serangan Man-In-The-Middle (MitM) arp spoofing dll
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"[ICMP] ICMP Redirect Message Detected (Possible MitM)"; itype:5; classtype:bad-unknown; sid:1000104; rev:1;)
+
+# 5. ICMP TRACEROUTE
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"[ICMP] Traceroute Detected"; itype:3; icode:3; ttl:1; classtype:network-scan; sid:1000105; rev:1;)
