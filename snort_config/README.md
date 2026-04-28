@@ -1,64 +1,115 @@
-# 🛡️ SNORT IDS/IPS & ACL Integration Guide (Kali Linux)
+# Panduan Pengerjaan SNORT di Kali Linux
 
-Direktori ini berisi seluruh konfigurasi yang dibutuhkan untuk mengintegrasikan SNORT dan ACL (iptables) guna melindungi Web Server Django Anda.
-
-## 📁 Struktur Direktori
-- `snort.conf` : Konfigurasi utama engine SNORT.
-- `rules/` : Kumpulan rule pendeteksi (SQLi, XSS, Brute Force, ICMP, Port Scan).
-- `update_rules.sh` : Script Bash untuk update dan memvalidasi rule (mirip dengan PulledPork).
-- `acl/iptables_rules.sh` : Script Bash untuk Access Control List pada level jaringan.
+Snort adalah sistem deteksi intrusi jaringan (Network Intrusion Detection System / NIDS) tipe *open-source*. Berikut adalah tahapan lengkap dari instalasi hingga pembuatan *rules* untuk mendeteksi serangan di Kali Linux.
 
 ---
 
-## 🚀 Cara Implementasi di Kali Linux VM
+## Tahap 1: Instalasi Snort
 
-### 1. Instalasi SNORT
-Jika belum terinstall di Kali Linux:
+1. **Update Repository Kali Linux**
+   Buka terminal di Kali Linux dan jalankan perintah:
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   ```
+
+2. **Install Snort**
+   ```bash
+   sudo apt install snort -y
+   ```
+   *Catatan:* Saat proses instalasi, Anda akan diminta memasukkan rentang IP jaringan Anda (Network Range). Misalnya `192.168.1.0/24`. Anda bisa mengecek IP Anda menggunakan perintah `ip a` atau `ifconfig`.
+
+---
+
+## Tahap 2: Konfigurasi Dasar
+
+1. **Cari Tahu Interface Jaringan Anda**
+   ```bash
+   ip a
+   ```
+   Perhatikan nama *interface* yang terhubung ke internet/target (biasanya `eth0` atau `wlan0`).
+
+2. **Edit File Konfigurasi Snort (`snort.conf`)**
+   Gunakan editor teks seperti `nano`:
+   ```bash
+   sudo nano /etc/snort/snort.conf
+   ```
+   Cari baris `ipvar HOME_NET any` dan ubah `any` menjadi rentang IP Anda:
+   ```text
+   ipvar HOME_NET 192.168.1.0/24
+   ```
+   *(Simpan dengan menekan `Ctrl+O`, `Enter`, lalu `Ctrl+X`).*
+
+3. **Verifikasi Konfigurasi**
+   Pastikan tidak ada error (ganti `eth0` dengan interface Anda):
+   ```bash
+   sudo snort -T -c /etc/snort/snort.conf -i eth0
+   ```
+   Jika di akhir muncul tulisan **"Snort successfully validated the configuration!"**, berarti konfigurasi sudah aman.
+
+---
+
+## Tahap 3: Pembuatan Aturan (Rules) Kustom
+
+Snort mendeteksi serangan berdasarkan *rules*. Kita akan membuat *rules* sederhana untuk mendeteksi ping (ICMP) atau serangan XSS/SQL Injection.
+
+1. **Buka File Rules Lokal**
+   ```bash
+   sudo nano /etc/snort/rules/local.rules
+   ```
+
+2. **Tambahkan Rules Sederhana**
+   Tambahkan baris berikut di paling bawah file:
+
+   **A. Deteksi Ping (ICMP)**
+   ```text
+   alert icmp any any -> $HOME_NET any (msg:"Peringatan: Ada aktivitas PING terdeteksi!"; sid:1000001; rev:1;)
+   ```
+
+   **B. Deteksi Serangan XSS Sederhana**
+   ```text
+   alert tcp any any -> $HOME_NET 8000 (msg:"Peringatan: Potensi XSS <script> terdeteksi!"; content:"<script>"; sid:1000002; rev:1;)
+   ```
+
+   **C. Deteksi Potensi SQL Injection**
+   ```text
+   alert tcp any any -> $HOME_NET 8000 (msg:"Peringatan: Potensi SQL Injection (' OR 1=1)"; content:"' OR 1=1"; sid:1000003; rev:1;)
+   ```
+
+---
+
+## Tahap 4: Menjalankan Snort (Mode Deteksi)
+
+Sekarang kita akan menyalakan Snort agar ia mendengarkan lalu lintas jaringan dan mencetak peringatan ke layar terminal.
+
+Jalankan perintah ini (ganti `eth0` dengan interface Anda):
 ```bash
-sudo apt update
-sudo apt install snort
+sudo snort -A console -q -c /etc/snort/snort.conf -i eth0
 ```
-*(Saat diminta nama interface, isikan interface jaringan Anda, misal `eth0`)*
+*(Snort akan terlihat diam, artinya ia sedang memantau/mendengarkan di latar belakang).*
 
-### 2. Copy Konfigurasi ke Sistem
-Copy folder `rules` dan file `snort.conf` ke direktori instalasi SNORT di Kali Linux:
-```bash
-# Backup config bawaan
-sudo cp /etc/snort/snort.conf /etc/snort/snort.conf.backup
+---
 
-# Copy config dan rule buatan kita
-sudo cp snort.conf /etc/snort/
-sudo cp rules/*.rules /etc/snort/rules/
-```
+## Tahap 5: Pengujian (Testing) Serangan
 
-### 3. Eksekusi ACL (IPTables)
-Script ini akan langsung menerapkan firewall untuk melindungi Nginx, Django, dan MySQL.
-```bash
-cd acl
-sudo chmod +x iptables_rules.sh
-sudo ./iptables_rules.sh
-```
+Buka **Terminal Baru** di Kali Linux (biarkan terminal Snort tetap menyala), lalu lakukan pengujian:
 
-### 4. Uji Coba Rule Manual & Update
-Jika Anda merubah rule ICMP atau Port, jalankan script update:
-```bash
-sudo chmod +x update_rules.sh
-sudo ./update_rules.sh
-```
+1. **Uji Coba PING**
+   Ping ke IP komputer target Anda:
+   ```bash
+   ping 192.168.1.X
+   ```
+   👉 *Lihat ke terminal Snort, seharusnya akan muncul log merah "Peringatan: Ada aktivitas PING terdeteksi!"*
 
-### 5. Jalankan SNORT
-Jalankan SNORT dalam mode IDS (Intrusion Detection System) dengan logging ke `/var/log/snort/`:
-```bash
-sudo snort -A fast -c /etc/snort/snort.conf -i eth0 -D
-```
-*(Ganti `eth0` dengan interface yang sesuai di Kali VM Anda)*
+2. **Uji Coba XSS / Serangan Web**
+   Jika Anda menjalankan server Django di Kali Linux pada port 8000, Anda bisa mencoba mengirim request HTTP via `curl`:
+   ```bash
+   curl "http://127.0.0.1:8000/accounts/login/?username=<script>alert('XSS')</script>"
+   ```
+   👉 *Snort akan langsung berteriak "Peringatan: Potensi XSS terdeteksi!" karena ia melihat ada string `<script>` melintas di jaringan.*
 
-### 6. Simulasi Serangan (Testing)
-Dari komputer host atau VM lain, cobalah lakukan serangan:
-
-- **Nmap Scan:** `nmap -sS <IP_KALI>`
-- **Ping Flood:** `ping -f <IP_KALI>`
-- **SQLi Web:** Buka browser dan arahkan ke login dengan payload `UNION SELECT`
-- **Brute Force:** Coba login salah berkali-kali dengan cepat
-
-Lalu pantau log di Django Web Dashboard Anda!
+## Kesimpulan Presentasi
+Jika ini untuk keperluan presentasi tugas kuliah, Anda bisa menunjukkan:
+1. File `local.rules` yang sudah Anda modifikasi.
+2. Menyalakan Snort di mode console.
+3. Melakukan eksekusi serangan (misal Ping atau Curl payload XSS).
+4. Menunjukkan layar bahwa Snort berhasil menangkap paket tersebut secara *Real-Time*.

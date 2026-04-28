@@ -1,0 +1,16 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.env
+db.sqlite3
+.git
+.vscode/
+.idea/
+snort_config/
+laporan_implementasi_https.md
+push_ke_github.ps1
