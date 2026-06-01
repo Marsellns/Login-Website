@@ -6,12 +6,14 @@ services:
     container_name: secure_auth_django_web
     ports:
       - "8000:8000"
+      - "8443:8443"
     volumes:
       # Mount folder lokal ke dalam kontainer agar perubahan kode (live reload) langsung terbaca
       - .:/app
     environment:
       - DJANGO_SETTINGS_MODULE=secure_auth.settings_dev
+      - DJANGO_SECRET_KEY=kunci-rahasia-untuk-testing-snort-123
     command: >
       bash -c "python manage.py migrate --settings=secure_auth.settings_dev &&
-               python manage.py runserver 0.0.0.0:8000 --settings=secure_auth.settings_dev"
+               python manage.py runsslserver 0.0.0.0:8443 --settings=secure_auth.settings_dev"
     restart: always
