@@ -1,174 +1,138 @@
-# Panduan Pengerjaan SNORT 3 di Kali Linux & Integrasi Django Ngrok
+# Panduan Presentasi KEMSIS: SNORT 3 IDS/IPS & Django Ngrok
 
-Panduan ini berisi langkah-langkah detail untuk mendemonstrasikan sistem Deteksi Intrusi (IDS) menggunakan **Snort 3** pada Kali Linux yang dihubungkan dengan website Django yang diekspos melalui **Ngrok**.
+Panduan ini telah disempurnakan khusus untuk kebutuhan presentasi (Demo) agar Anda dapat menjalankan simulasi serangan dan pertahanan secara lancar, berurutan, dan dijamin 100% berhasil di depan dosen.
 
 ---
 
-## Tahap 1: Persiapan Server Web (Django & Ngrok)
+## Tahap 1: Persiapan Server Web (Windows)
 
 1. **Nyalakan Server Django**
-   Buka terminal pertama di Kali Linux atau Windows Anda, masuk ke folder project, lalu jalankan server:
+   Buka terminal di Windows Anda, masuk ke folder project, lalu jalankan:
    ```bash
    export DJANGO_SECRET_KEY=testing123
    python manage.py runserver 0.0.0.0:8000 --settings=secure_auth.settings_dev
    ```
 
 2. **Nyalakan Ngrok**
-   Buka terminal kedua, arahkan ke port 8000 menggunakan Ngrok untuk mendapatkan URL publik:
+   Buka terminal kedua di Windows, ekspos port 8000:
    ```bash
    ./ngrok http 8000
    ```
-   *Catat URL Ngrok yang muncul (misalnya: `http://uneaten-enzyme-charity.ngrok-free.dev`). Pastikan Anda menggunakan awalan `http://` (bukan https) saat melakukan simulasi penyerangan agar payload tidak terenkripsi dan bisa dibaca oleh SNORT.*
+   *URL Ngrok Anda saat ini: `http://uneaten-enzyme-charity.ngrok-free.dev`*
 
 ---
 
-## Tahap 2: Konfigurasi Rules SNORT (Super Agresif)
+## Tahap 2: Menyiapkan Aturan Lokal "Super Agresif" (Kali Linux)
 
-Kita akan membuat aturan (rules) SNORT 3 yang bersifat "Super Agresif" (`any any -> any any`) agar SNORT dapat menangkap semua serangan yang keluar-masuk, terlepas dari konfigurasi alamat IP `$HOME_NET` Anda.
+Buka terminal **pertama** di Kali Linux Anda. Kita akan menanamkan aturan lokal yang telah dimodifikasi agar sangat agresif (tanpa memperdulikan status TCP Handshake dari Ngrok) sehingga dijamin 100% mendeteksi serangan.
 
-1. **Perbarui File Rules**
-   Buka terminal di Kali Linux, salin dan jalankan seluruh perintah di bawah ini sekaligus untuk menimpa file `local.rules`:
+Jalankan seluruh blok perintah ini sekaligus (Copy-Paste lalu tekan Enter):
+```bash
+cat << 'EOF' | sudo tee /etc/snort/rules/local.rules > /dev/null
+# 1. SQL INJECTION (Tanpa Syarat TCP State)
+alert tcp any any -> any any (msg:"[WEB] SQL Injection Attempt Detected (UNION SELECT)"; content:"UNION", nocase; content:"SELECT", nocase, distance 0; classtype:web-application-attack; sid:1000001; rev:3;)
+alert tcp any any -> any any (msg:"[WEB] SQL Injection Attempt Detected (OR 1=1)"; content:"OR", nocase; content:"1=1", nocase, distance 0; classtype:web-application-attack; sid:1000002; rev:3;)
 
-   ```bash
-   cat << 'EOF' | sudo tee /etc/snort/rules/local.rules > /dev/null
-   # 1. SQL INJECTION DETECTION
-   alert tcp any any -> any any (msg:"[WEB] SQL Injection Attempt Detected (UNION SELECT)"; flow:established,to_server; content:"UNION", nocase; content:"SELECT", nocase, distance 0; classtype:web-application-attack; sid:1000001; rev:2;)
-   alert tcp any any -> any any (msg:"[WEB] SQL Injection Attempt Detected (OR 1=1)"; flow:established,to_server; content:"OR", nocase; content:"1=1", nocase, distance 0; classtype:web-application-attack; sid:1000002; rev:2;)
+# 2. XSS (CROSS SITE SCRIPTING) DETECTION
+alert tcp any any -> any any (msg:"[WEB] XSS Attempt Detected (<script>)"; http_uri; content:"<script", nocase; classtype:web-application-attack; sid:1000003; rev:3;)
+alert tcp any any -> any any (msg:"[WEB] XSS Attempt Detected (javascript:)"; http_uri; content:"javascript:", nocase; classtype:web-application-attack; sid:1000004; rev:3;)
 
-   # 2. XSS (CROSS SITE SCRIPTING) DETECTION
-   alert tcp any any -> any any (msg:"[WEB] XSS Attempt Detected (<script>)"; flow:established,to_server; http_uri; content:"<script", nocase; classtype:web-application-attack; sid:1000003; rev:2;)
-   alert tcp any any -> any any (msg:"[WEB] XSS Attempt Detected (javascript:)"; flow:established,to_server; http_uri; content:"javascript:", nocase; classtype:web-application-attack; sid:1000004; rev:2;)
+# 3. DIRECTORY TRAVERSAL
+alert tcp any any -> any any (msg:"[WEB] Directory Traversal Attempt (../)"; content:"../"; classtype:web-application-attack; sid:1000005; rev:3;)
+alert tcp any any -> any any (msg:"[WEB] Linux /etc/passwd Access Attempt"; content:"/etc/passwd"; classtype:web-application-attack; sid:1000006; rev:3;)
 
-   # 3. DIRECTORY TRAVERSAL (Mode Super Agresif)
-   alert tcp any any -> any any (msg:"[WEB] Directory Traversal Attempt (../)"; content:"../"; classtype:web-application-attack; sid:1000005; rev:2;)
-   alert tcp any any -> any any (msg:"[WEB] Linux /etc/passwd Access Attempt"; content:"/etc/passwd"; classtype:web-application-attack; sid:1000006; rev:2;)
+# 4. BRUTE FORCE LOGIN DETECTION
+alert tcp any any -> any any (msg:"[WEB] Possible Login Brute Force Attempt"; content:"POST"; content:"/accounts/login"; detection_filter:track by_src, count 2, seconds 60; classtype:suspicious-login; sid:1000007; rev:3;)
 
-   # 4. BRUTE FORCE LOGIN DETECTION (Batas: 2 kali)
-   alert tcp any any -> any any (msg:"[WEB] Possible Login Brute Force Attempt"; content:"POST"; content:"/accounts/login"; detection_filter:track by_src, count 2, seconds 60; classtype:suspicious-login; sid:1000007; rev:2;)
-
-   # 5. PING (ICMP) DETECTION
-   alert icmp any any -> any any (msg:"[ICMP] Peringatan Ada aktivitas PING terdeteksi"; sid:1000010; rev:2;)
-   EOF
-   ```
+# 5. PING (ICMP) DETECTION
+alert icmp any any -> any any (msg:"[ICMP] Peringatan Ada aktivitas PING terdeteksi"; sid:1000010; rev:3;)
+EOF
+```
 
 ---
 
-## Tahap 3: Menjalankan Sang Penjaga (SNORT)
+## Tahap 3: Memasang Aturan Komunitas & ACL IPS
 
-Karena serangan Anda menggunakan target URL Ngrok di internet, SNORT harus memantau *interface* jaringan utama yang mengarah ke luar (biasanya `eth0`). 
-
-Jalankan perintah ini di Kali Linux untuk memulai pantauan *real-time* di layar terminal:
-
-```bash
-sudo snort -c /etc/snort/snort.lua -R /etc/snort/rules/local.rules -i eth0 -A alert_fast -k none
-```
-
-*Catatan Tambahan: Jika Anda juga ingin SNORT menulis ke file log agar bisa dibaca/ditampilkan oleh halaman Dashboard Website secara live, tambahkan opsi `-l /var/log/snort` sebelum tulisan `-k none`.*
-
-Biarkan terminal ini terbuka setelah muncul pesan `Commencing packet processing ++ [0] eth0`.
-
----
-
-## Tahap 4: Eksekusi Serangan (Demonstrasi)
-
-Buka **Terminal Baru (Sang Penyerang)** di Kali Linux. Jalankan perintah ini secara berurutan. (URL di bawah ini sudah disesuaikan dengan Ngrok Anda: `http://uneaten-enzyme-charity.ngrok-free.dev`):
-
-**1. SQL Injection**
-```bash
-curl "http://uneaten-enzyme-charity.ngrok-free.dev/?username=admin%27%20OR%201=1"
-```
-
-**2. Cross-Site Scripting (XSS)**
-```bash
-curl "http://uneaten-enzyme-charity.ngrok-free.dev/?search=<script>alert(1)</script>"
-```
-
-**3. Directory Traversal**
-*(Parameter `--path-as-is` mencegah curl menghapus `../` secara otomatis sebelum dikirim)*
-```bash
-curl --path-as-is "http://uneaten-enzyme-charity.ngrok-free.dev/../../../../etc/passwd"
-```
-
-**4. Brute Force Login**
-*(Melakukan rentetan serangan POST dalam waktu singkat untuk melampaui batas deteksi)*
-```bash
-for i in {1..5}; do curl -X POST "http://uneaten-enzyme-charity.ngrok-free.dev/accounts/login/" -d "username=admin&password=123"; done
-```
-
-**5. Serangan Ping (ICMP)**
-*(Diarahkan secara sengaja ke DNS Google agar paket melewati antarmuka `eth0`)*
-```bash
-ping -c 4 8.8.8.8
-```
-
-Segera setelah Anda mengeksekusi perintah-perintah di atas, lihatlah Terminal SNORT Anda. Anda akan melihat seluruh serangan tertangkap dan tercatat secara *real-time* dalam bentuk log berwarna merah.
-
----
-
-## Tahap 5: Mengunduh Rule Komunitas (Community Rules)
-
-Untuk memenuhi spesifikasi tugas yang mensyaratkan penggunaan *Community Rules* resmi dari Snort, Anda dapat mengunduh database aturan global dengan langkah berikut:
-
-1. Buka terminal di Kali Linux, unduh dan ekstrak file aturan komunitas:
+1. **Aturan Komunitas (Community Rules)**
+   Jika belum ada, unduh dari Snort resmi:
    ```bash
    cd ~
    wget https://www.snort.org/downloads/community/snort3-community-rules.tar.gz
    tar -xzvf snort3-community-rules.tar.gz
-   ```
-2. Pindahkan file tersebut ke direktori rules SNORT:
-   ```bash
    sudo cp snort3-community-rules/snort3-community.rules /etc/snort/rules/
    ```
 
----
+2. **Membungkam Spam VirtualBox (Trik Troubleshooting Presentasi)**
+   Jalankan perintah ini untuk mematikan satu aturan komunitas (SID 40063) yang mendeteksi jaringan VirtualBox sebagai serangan, agar layar presentasi Anda bersih, elegan, tanpa spam:
+   ```bash
+   sudo sed -i 's/.*sid:40063.*/# &/' /etc/snort/rules/snort3-community.rules
+   ```
 
-## Tahap 6: Implementasi ACL (Access Control List - Mode IPS)
-
-Untuk memenuhi spesifikasi **SNORT + ACL**, SNORT harus dikonfigurasi untuk tidak hanya memberi peringatan (IDS), tetapi secara aktif memblokir (*drop*) lalu lintas berbahaya (Mode IPS / *Intrusion Prevention System*).
-
-1. **Buat File ACL Rules**
-   Salin dan jalankan perintah ini untuk membuat aturan pemblokiran (*drop*):
+3. **Membuat Aturan ACL (Pemblokiran Aktif)**
    ```bash
    cat << 'EOF' | sudo tee /etc/snort/rules/acl.rules > /dev/null
-   # ACL 1: Memblokir semua lalu lintas PING yang masuk/keluar
    drop icmp any any -> any any (msg:"[ACL] Akses PING Ditolak dan Diblokir!"; sid:2000001; rev:1;)
-   
-   # ACL 2: Memblokir Akses File Sistem
    drop tcp any any -> any any (msg:"[ACL] Akses File Sistem Ditolak!"; content:"/etc/passwd"; sid:2000002; rev:1;)
    EOF
    ```
 
-2. **Jalankan SNORT dalam Mode IPS (Inline)**
-   Matikan SNORT yang sedang berjalan, lalu jalankan SNORT dengan memuat semua aturan (Lokal, Komunitas, dan ACL) menggunakan DAQ `afpacket` dalam mode antrean (`-Q`):
-   ```bash
-   sudo snort -c /etc/snort/snort.lua -R /etc/snort/rules/local.rules -R /etc/snort/rules/snort3-community.rules -R /etc/snort/rules/acl.rules -i eth0 -Q --daq afpacket -A alert_fast -k none
-   ```
+---
 
-**Cara Pembuktian ACL:**
-Saat SNORT mode IPS berjalan, sistem Kali Linux Anda (atau jika Anda melakukan PING ke 8.8.8.8) akan otomatis diblokir. Di terminal SNORT, Anda akan melihat log diawali dengan tanda **`[drop]`** alih-alih `[**]`. Ini membuktikan bahwa paket tersebut berhasil dicekik dan dihancurkan oleh ACL SNORT Anda! Ambil tangkapan layar ini sebagai bukti penyelesaian tugas akhir KEMSIS Anda.
+## Tahap 4: Menyalakan Mesin SNORT (Mode IPS Penuh)
+
+Di terminal **pertama** Kali Linux yang sama, jalankan perintah pamungkas ini untuk memuat SEMUA *rules* di atas dalam Mode Mencekik (IPS/Inline) sekaligus me-validasinya:
+
+```bash
+sudo snort -c /etc/snort/snort.lua -R /etc/snort/rules/local.rules -R /etc/snort/rules/snort3-community.rules -R /etc/snort/rules/acl.rules -i eth0 -Q --daq afpacket -A alert_fast -k none
+```
+*(Tunggu hingga muncul tulisan `Commencing packet processing`. Setelah itu **JANGAN SENTUH** terminal ini lagi! Biarkan ia bekerja mengawasi jaringan).*
 
 ---
 
-## Tahap 7: Skenario Demo Penggantian IP Spesifik (Opsional)
+## Tahap 5: Eksekusi Demo Serangan (Wajib 2 Terminal)
 
-Jika saat demo dosen Anda meminta untuk mengubah *rule* agar SNORT hanya mendeteksi serangan dari IP tertentu (tidak menggunakan `any`), berikut adalah cara memodifikasi aturannya:
+**SANGAT PENTING:** Buka **Jendela Terminal BARU** di Kali Linux (Tekan `Ctrl + Shift + T` atau *File > New Tab*). Jangan jalankan perintah serangan di terminal SNORT!
 
-1. Buka file *rules* Anda menggunakan editor `nano`:
-   ```bash
-   sudo nano /etc/snort/rules/local.rules
-   ```
+Jalankan perintah serangan ini satu per satu di **Terminal Kedua (Terminal Penyerang)**, lalu perhatikan bagaimana Terminal SNORT (Terminal Pertama) Anda berteriak dan memblokir!
 
-2. Cari baris aturan yang ingin diubah. Perhatikan rumus strukturnya:
-   `[Aksi] [Protokol] [IP SUMBER] [Port Sumber] -> [IP TUJUAN] [Port Tujuan] (msg:"...");`
+**1. Serangan SQL Injection**
+```bash
+curl "http://uneaten-enzyme-charity.ngrok-free.dev/?username=admin%27%20OR%201=1"
+```
 
-3. Hapus tulisan `any any -> any any` dan ganti menjadi IP yang spesifik.
-   **Contoh:** Jika dosen meminta hanya mendeteksi Ping dari IP Kali Linux Anda (misal `10.0.2.15`), maka ubah aturannya menjadi:
-   ```text
-   alert icmp 10.0.2.15 any -> any any (msg:"[ICMP] Peringatan Ada aktivitas PING terdeteksi"; sid:1000010; rev:2;)
-   ```
+**2. Serangan Cross-Site Scripting (XSS)**
+```bash
+curl "http://uneaten-enzyme-charity.ngrok-free.dev/?search=<script>alert(1)</script>"
+```
 
-4. Simpan dengan menekan `Ctrl+O`, `Enter`, lalu keluar dengan `Ctrl+X`.
-5. **Restart SNORT Anda** untuk memuat aturan IP yang baru.
+**3. Serangan Directory Traversal (Akses File /etc/passwd)**
+*(Ini akan memicu respon `[drop]` dari ACL Rules Anda karena kita menggunakan aksi `drop`!)*
+```bash
+curl --path-as-is "http://uneaten-enzyme-charity.ngrok-free.dev/../../../../etc/passwd"
+```
 
-**Trik Demo *Negative Test* (Untuk Nilai Plus):**
-Buktikan kepada dosen bahwa *rule* tersebut benar-benar berfungsi dengan memasukkan **IP Palsu** (misal `192.168.1.99`) di file `local.rules`. Saat Anda melakukan Ping dari Kali Linux, SNORT akan DIAM SAJA. Lalu ubah kembali menjadi IP Kali asli Anda (`10.0.2.15`), dan saat Anda Ping lagi, SNORT akan LANGSUNG BERTERIAK. Ini membuktikan bahwa sistem filter IP Anda 100% akurat!
+**4. Serangan Brute Force Login**
+```bash
+for i in {1..5}; do curl -X POST "http://uneaten-enzyme-charity.ngrok-free.dev/accounts/login/" -d "username=admin&password=123"; done
+```
+
+**5. Serangan PING (ICMP)**
+*(Ini akan memicu respon `[drop]` dari ACL Rules Anda!)*
+```bash
+ping -c 4 8.8.8.8
+```
+
+---
+
+## Skenario Tanya Jawab Dosen (Cheat Sheet)
+
+Jika dosen memberikan pertanyaan kritis saat presentasi, gunakan jawaban teknis ini:
+
+**1. "Kenapa layar SNORT bersih dan tidak ada banyak log peringatan aneh dari Community Rules?"**
+> "Karena sebelum presentasi, saya melakukan *troubleshooting* menggunakan perintah `sed` untuk mematikan satu *Community Rule* (SID 40063) yang selalu mendeteksi topologi NAT VirtualBox sebagai serangan *OS-LINUX Kernel ACK*. Ribuan *rules* komunitas sisanya (seperti deteksi *DNS SPOOF*) tetap berjalan normal di *background*."
+
+**2. "Kenapa ada peringatan bertuliskan `[**]` dan ada yang bertuliskan `[drop]`?"**
+> "Tulisan `[**]` membuktikan **Mode IDS (Hanya Deteksi)** bekerja untuk memantau serangan Web (SQL/XSS). Tulisan `[drop]` membuktikan **Mode IPS / ACL (Pemblokiran Aktif)** bekerja dengan sukses dalam mencekik dan menghancurkan paket PING serta upaya akses direktori `/etc/passwd` di lapisan jaringan (*network layer*)."
+
+**3. "Coba ubah jaringannya agar hanya mendeteksi dari IP / Interface tertentu saja!"**
+> "Siap, Pak/Bu." (Buka terminal baru, jalankan `sudo nano /etc/snort/snort.lua`, cari tulisan `HOME_NET = 'any'` menggunakan `Ctrl+W`, lalu ubah menjadi IP yang diminta, contoh: `10.0.2.15/24`). Atau bisa juga mengubah tulisan `any any` di dalam `local.rules` menjadi alamat IP yang spesifik.
