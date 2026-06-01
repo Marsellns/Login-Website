@@ -134,5 +134,7 @@ Jika dosen memberikan pertanyaan kritis saat presentasi, gunakan jawaban teknis 
 **2. "Kenapa ada peringatan bertuliskan `[**]` dan ada yang bertuliskan `[drop]`?"**
 > "Tulisan `[**]` membuktikan **Mode IDS (Hanya Deteksi)** bekerja untuk memantau serangan Web (SQL/XSS). Tulisan `[drop]` membuktikan **Mode IPS / ACL (Pemblokiran Aktif)** bekerja dengan sukses dalam mencekik dan menghancurkan paket PING serta upaya akses direktori `/etc/passwd` di lapisan jaringan (*network layer*)."
 
-**3. "Coba ubah jaringannya agar hanya mendeteksi dari IP / Interface tertentu saja!"**
-> "Siap, Pak/Bu." (Buka terminal baru, jalankan `sudo nano /etc/snort/snort.lua`, cari tulisan `HOME_NET = 'any'` menggunakan `Ctrl+W`, lalu ubah menjadi IP yang diminta, contoh: `10.0.2.15/24`). Atau bisa juga mengubah tulisan `any any` di dalam `local.rules` menjadi alamat IP yang spesifik.
+**3. "Coba ubah konfigurasinya agar SNORT hanya mendeteksi serangan yang mengarah ke IP Kali Linux kamu saja!"**
+> **Jawaban & Cara Praktik:**
+> *   **Cara 1 (Ubah `local.rules`):** Buka `sudo nano /etc/snort/rules/local.rules`. Ubah tulisan `any any -> any any` menjadi `any any -> 10.0.2.15 any` (Tujuan spesifik ke IP Kali Linux).
+> *   **Cara 2 (Cara Profesional/System Admin):** *"Pak/Bu, dalam skala industri kita menggunakan Variabel Global."* Buka `sudo nano /etc/snort/snort.lua`, tekan `Ctrl+W`, cari `HOME_NET = 'any'`, lalu ubah menjadi blok jaringan Anda misalnya `HOME_NET = '10.0.2.0/24'`. Dengan ini, ke-4000 aturan komunitas juga otomatis hanya memantau jaringan internal.
