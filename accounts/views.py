@@ -239,7 +239,9 @@ def snort_logs_view(request):
     Jika file tidak ada (karena berjalan di OS lain untuk testing), 
     kita generate dummy data untuk keperluan demo UI/UX.
     """
-    log_path = "/var/log/snort/alert"
+    log_path = "/var/log/snort/alert_fast.txt"
+    if not os.path.exists(log_path):
+        log_path = "/var/log/snort/alert"
     alerts = []
     
     # Kategori serangan untuk statistik
